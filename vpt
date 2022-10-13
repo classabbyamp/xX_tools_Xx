@@ -1,0 +1,14 @@
+#!/bin/sh
+
+XBPS_DISTDIR="$(xdistdir)" || exit 1
+
+file="$1"
+
+case "$file" in
+	*/*) ;;
+	*) file="$file/template" ;;
+esac
+
+file="$(realpath $XBPS_DISTDIR/srcpkgs/$file)" || exit 1
+
+exec $EDITOR $file

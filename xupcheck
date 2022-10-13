@@ -1,0 +1,16 @@
+#!/bin/sh
+
+while getopts vhj: flag; do
+	case $flag in
+		v) verbose=yes ;;
+		j) procs="$OPTARG" ;;
+		h|?) echo "usage: xupcheck [-v] [-j#] <pkgname...>"; exit 0 ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+XBPS_DISTDIR=$(xdistdir 2>/dev/null) || exit 1
+procs=${procs:-0}
+
+echo "$@" | xargs -n1 -P $procs env XBPS_UPDATE_CHECK_VERBOSE=$verbose "$XBPS_DISTDIR/xbps-src" update-check
