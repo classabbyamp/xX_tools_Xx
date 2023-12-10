@@ -15,7 +15,7 @@ if [ "$1" = "-R" ]; then
 fi
 
 for pkg in $@; do
-	ARGS+=" --include=$pkg*"
+	ARGS+=" --include=*$pkg*"
 done
 
 rsync --dry-run \
@@ -25,5 +25,5 @@ rsync --dry-run \
 	$ARGS \
 	--exclude='*' \
 	$REPO | \
-	awk '/\.xbps(\.sig)?$/ { $1=$2=$3=$4=""; print "/current/" substr($0,5); }' | \
+	awk '/(\.xbps(\.sig2?)?|-repodata)$/ { $1=$2=$3=$4=""; print "/current/" substr($0,5); }' | \
 	sort -u

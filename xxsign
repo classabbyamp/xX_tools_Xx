@@ -1,0 +1,35 @@
+#!/bin/sh
+# xxsign [-p <key>] [-s <signedby>] <dir ...> - sign directories of xbps packages
+
+while getopts p:s:h flag; do
+	case $flag in
+		p) PRIVKEY="--privkey $OPTARG" ;;
+		s) SIGNEDBY="$OPTARG" ;;
+		h|?)
+			echo "Usage: xxsign [-p <privkey>] [-s <signedby>] <dir ...>" >&2
+			exit 1 ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+XDISTDIR="$(xdistdir)"
+
+: "${PRIVKEY:=--privkey $HOME/.ssh/reposign.pem}"
+: "${SIGNEDBY:=$(git -C "$XDISTDIR" config user.name)}"
+
+for repodir; do
+	if [ -d "$repodir" ]; then
+		for arch in x86_64 x86_64-musl i686 aarch64 aarch64-musl \
+			armv6l armv6l-musl armv7l armv7l-musl; do
+			if [ -e "${repodir}/${arch}-repodata" ]; then
+				XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY --signedby "$SIGNEDBY" -s "$repodir"
+				# -f doesn't seem to work right
+				rm -f "$repodir"/*".$arch.xbps.sig"
+				XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY -S "$repodir"/*".$arch.xbps"
+			fi
+		done
+	else
+		echo "$0: $repodir: directory not found" >&2
+	fi
+done

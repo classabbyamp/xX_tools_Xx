@@ -1,1 +1,20 @@
-#compdef 
+#compdef vpt xcat xupcheck
+
+_xtools # force autoload
+
+_xupcheck() {
+	_arguments : \
+		'-v[verbose]' \
+		'-j[parallelism]' \
+		'*:templates:_xtools_all_packages'
+}
+
+_xx_tools_xx() {
+	case "$service" in
+		vpt) _xtools_one_template "$@";;
+		xcat) _xtools_one_template "$@";;
+		xupcheck) _xupcheck "$@";;
+	esac
+}
+
+_xx_tools_xx "$@"
