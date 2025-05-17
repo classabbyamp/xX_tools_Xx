@@ -1,0 +1,70 @@
+#!/bin/bash
+
+usage() {
+    cat << EOF
+usage: xforcebuild -u <USERNAME> -p <PASSWORD> [-r <REASON>] PKGS...
+EOF
+}
+
+USERNAME="$(id -un)"
+PASSWORD=
+REASON="force build"
+ARCHS=(
+    x86_64 i686 armv7l armv6l
+    x86_64-musl armv7l-musl armv6l-musl
+    aarch64 aarch64-musl
+)
+
+while getopts a:u:p:r:h flag; do
+    case "$flag" in
+        a) read -ra ARCHS <<< "$OPTARG" ;;
+        u) USERNAME="$OPTARG" ;;
+        p) PASSWORD="$OPTARG" ;;
+        r) REASON="$OPTARG" ;;
+        h) usage; exit ;;
+        ?) usage exit 1 ;;
+    esac
+done
+
+shift $(( OPTIND - 1 ))
+
+PKGS=("$@")
+REASON+=" [via xforcebuild]"
+
+if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+    echo "=> ERROR: Missing credentials"
+    exit 1
+fi
+
+if [ "${#PKGS[@]}" -eq 0 ]; then
+    echo "=> Nothing to do"
+    exit
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+    echo "=> Missing curl"
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "=> Missing jq"
+    exit 1
+fi
+
+bb_cookie="$(curl -sf https://build.voidlinux.org/auth/login --basic -u "${USERNAME}:${PASSWORD}" -c -)" || {
+    echo "=> ERROR: Login failed"
+    exit 2
+}
+
+declare -A builders
+while read -r name id; do
+    builders["$name"]="$id"
+done < <(curl -sf https://build.voidlinux.org/api/v2/builders | jq -r '.builders[] | "\(.name) \(.builderid)"')
+
+for arch in "${ARCHS[@]}"; do
+    printf "=> Submitting build for %s... " "${arch}"
+
+    PAYLOAD='{"id":1,"jsonrpc":"2.0","method":"force","params":{"builderid":"'"${builders["$arch"]}"'","username":"'"$USERNAME"'","reason":"'"$REASON"'","priority":0,"branch":"","project":"","repository":"","revision":"","packages_force":"'"${PKGS[*]}"'"}}'
+
+    curl -sf --cookie <(echo "$bb_cookie") --json "$PAYLOAD" https://build.voidlinux.org/api/v2/forceschedulers/force >/dev/null && echo "Submitted" || echo "Failed"
+done
