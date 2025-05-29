@@ -1,10 +1,16 @@
 #!/bin/sh
 # xxsign [-p <key>] [-s <signedby>] <dir ...> - sign directories of xbps packages
 
-while getopts p:s:h flag; do
+SERVE=
+PRIVKEY=
+SIGNEDBY=
+: "${XXSIGN_ARCHS:=x86_64 x86_64-musl i686 aarch64 aarch64-musl armv6l armv6l-musl armv7l armv7l-musl}"
+
+while getopts p:s:Sh flag; do
 	case $flag in
 		p) PRIVKEY="--privkey $OPTARG" ;;
 		s) SIGNEDBY="$OPTARG" ;;
+		S) SERVE=yes ;;
 		h|?)
 			echo "Usage: xxsign [-p <privkey>] [-s <signedby>] <dir ...>" >&2
 			exit 1 ;;
@@ -13,6 +19,11 @@ done
 
 shift $(( OPTIND - 1 ))
 
+if [ -n "$SERVE" ] && [ "$#" -ne 1 ]; then
+	echo "xxsign: can only serve one directory" >&2
+	exit 1
+fi
+
 XDISTDIR="$(xdistdir)"
 
 : "${PRIVKEY:=--privkey $HOME/.ssh/reposign.pem}"
@@ -20,16 +31,23 @@ XDISTDIR="$(xdistdir)"
 
 for repodir; do
 	if [ -d "$repodir" ]; then
-		for arch in x86_64 x86_64-musl i686 aarch64 aarch64-musl \
-			armv6l armv6l-musl armv7l armv7l-musl; do
+		for arch in $XXSIGN_ARCHS; do
 			if [ -e "${repodir}/${arch}-repodata" ]; then
 				XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY --signedby "$SIGNEDBY" -s "$repodir"
 				# -f doesn't seem to work right
 				rm -f "$repodir"/*".$arch.xbps.sig"
-				XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY -S "$repodir"/*".$arch.xbps"
+				if find "$repodir" -name "*.$arch.xbps" -quit >/dev/null 2>&1; then
+					XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY -S "$repodir"/*".$arch.xbps"
+				fi
+				if find "$repodir" -name "*.noarch.xbps" -quit >/dev/null 2>&1; then
+					XBPS_TARGET_ARCH="$arch" xbps-rindex $PRIVKEY -S "$repodir"/*".noarch.xbps"
+				fi
 			fi
 		done
 	else
 		echo "$0: $repodir: directory not found" >&2
+	fi
+	if [ -n "$SERVE" ]; then
+		exec python3 -m http.server -d "$repodir"
 	fi
 done
