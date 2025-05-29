@@ -1,14 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 
 XBPS_DISTDIR="$(xdistdir)" || exit 1
 
-file="$1"
+files=()
 
-case "$file" in
-	*/*) ;;
-	*) file="$file/template" ;;
-esac
+for f; do
+	fp=
+	case "$f" in
+		srcpkgs/*) fp="${f#srcpkgs/}" ;;
+		*/*) fp="$f" ;;
+		*) fp="$f/template" ;;
+	esac
+	fp="$(realpath "$XBPS_DISTDIR/srcpkgs/$fp" 2>/dev/null)" && files+=("$fp") || echo "ERROR: could not find $f" >&2
+done
 
-file="$(realpath $XBPS_DISTDIR/srcpkgs/$file)" || exit 1
-
-exec $EDITOR $file
+if [ "${#files[@]}" -gt 0 ]; then
+    exec $EDITOR "${files[@]}"
+fi
