@@ -17,7 +17,7 @@ ARCHS=(
 
 while getopts a:u:p:r:h flag; do
     case "$flag" in
-        a) read -ra ARCHS <<< "$OPTARG" ;;
+        a) IFS=',' read -ra ARCHS <<< "$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
         p) PASSWORD="$OPTARG" ;;
         r) REASON="$OPTARG" ;;
